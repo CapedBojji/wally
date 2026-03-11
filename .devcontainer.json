@@ -1,5 +1,3 @@
 {
-  "features": {
-    "ghcr.io/devcontainer-community/devcontainer-features/nixos.org:1": {}
-  }
+  "image": "ghcr.io/zombiezen/codespaces-nix"
 }
