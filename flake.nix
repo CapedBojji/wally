@@ -4,55 +4,49 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     utils.url = "github:numtide/flake-utils";
-    naersk.url = "github:nix-community/naersk";
-    rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
-  outputs = { self, nixpkgs, utils, naersk, rust-overlay }:
-    utils.lib.eachDefaultSystem (system:
-      let
-        overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
-
-        rustToolchain = pkgs.rust-bin.stable.latest.default;
-
-        naersk-lib = pkgs.callPackage naersk {
-          cargo = rustToolchain;
-          rustc = rustToolchain;
-        };
-
-        nativeBuildInputs = with pkgs; [
-          pkg-config
-        ];
-
-        buildInputs = with pkgs; [
-          openssl
-          zlib
-          libiconv
-        ] ++ lib.optionals stdenv.isDarwin [
-          darwin.apple_sdk.frameworks.Security
-          darwin.apple_sdk.frameworks.CoreFoundation
-        ];
-
-      in
-      {
-        packages.default = naersk-lib.buildPackage {
+  outputs = {
+    self,
+    nixpkgs,
+    utils,
+  }:
+    utils.lib.eachDefaultSystem (
+      system: let
+        pkgs = import nixpkgs {inherit system;};
+      in {
+        packages.default = pkgs.rustPlatform.buildRustPackage {
+          pname = "wally";
+          version = "0.3.2";
           src = ./.;
-          inherit nativeBuildInputs buildInputs;
-          copyLibs = true;
+
+          # You will need to update this hash when you run the build.
+          # Nix will tell you the correct hash if this one is wrong.
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            outputHashes = {
+              "rocket-0.5.0-rc.3" = "sha256-V6Kusn5ZIClIG6Cd1GtVtuJYw2FsT2PNVVQG0vhRrsE=";
+            };
+          };
+
+          nativeBuildInputs = [pkgs.pkg-config];
+
+          buildInputs = [
+            pkgs.openssl
+            pkgs.zlib
+          ];
+
+          doCheck = false; # Skip tests if they require network/roblox environment
         };
 
         devShells.default = pkgs.mkShell {
-          nativeBuildInputs = nativeBuildInputs ++ [
-            rustToolchain
+          inputsFrom = [self.packages.${system}.default];
+          packages = [
+            self.packages.${system}.default
+            pkgs.rustc
+            pkgs.cargo
           ];
-          inherit buildInputs;
-
-          shellHook = ''
-            export RUST_BACKTRACE=1
-          '';
+          shellHook = "export RUST_BACKTRACE=1";
         };
       }
     );
